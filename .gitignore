@@ -1,0 +1,7 @@
+*.depend
+*.layout
+*.vtk
+bin/
+obj/
+vtk_fluid/
+vtk_particle/
