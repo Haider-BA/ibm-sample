@@ -33,10 +33,6 @@
 			<Add option="-Wall" />
 			<Add option="-fexceptions" />
 		</Compiler>
-		<Unit filename="ParticleStruct.hpp" />
-		<Unit filename="SimulationParameters.hpp" />
-		<Unit filename="WriteFiles.cpp" />
-		<Unit filename="WriteFiles.hpp" />
 		<Unit filename="main.cpp" />
 		<Extensions>
 			<code_completion />
