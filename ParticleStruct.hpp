@@ -1,6 +1,7 @@
 #ifndef PARTICLE_STRUCT_HPP_
 #define PARTICLE_STRUCT_HPP_
 #include <cmath>
+#define M_PI 3.14159265
 
 /// Particle properties
 
@@ -58,8 +59,6 @@ struct particle_struct {
    num_nodes = particle_num_nodes;
    radius = particle_radius;
    stiffness = particle_stiffness;
-   u_x = 0.0;
-   u_y = 0.0;
    center.x = particle_center_x;
    center.y = particle_center_y;
    center.x_ref = particle_center_x;
@@ -86,8 +85,6 @@ struct particle_struct {
  int num_nodes; // number of surface nodes
  double radius; // object radius
  double stiffness; // stiffness modulus
- double u_x;  // x vel of particle
- double u_y;  // y vel of particle
  node_struct center; // center node
  node_struct *node; // list of nodes
 };

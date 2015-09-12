@@ -10,6 +10,6 @@ const int t_num = 50000; // number of time steps (running from 1 to t_num)
 const int t_disk = 200; // disk write time step (data will be written to the disk every t_disk step)
 const int t_info = 1000; // info time step (screen message will be printed every t_info step)
 const double gravity = 0.0; // force density due to gravity (in positive x-direction)
-const double wall_vel_bottom = 0.1; // velocity of the bottom wall (in positive x-direction)
-const double wall_vel_top = -0.1; // velocity of the top wall (in positive x-direction)
+const double wall_vel_bottom = 0.2; // velocity of the bottom wall (in positive x-direction)
+const double wall_vel_top = -0.2; // velocity of the top wall (in positive x-direction)
 #endif // SIMULATION_PARAMETERS_HPP_
