@@ -58,17 +58,17 @@ using namespace std; // permanently use the standard namespace
 // - for simulation of a deformable red blood cell
 // - the cell moves along with the flow
 
-//#define RIGID_CYLINDER
-#define DEFORMABLE_CYLINDER
+#define RIGID_CYLINDER
+//#define DEFORMABLE_CYLINDER
 //#define DEFORMABLE_RBC
 
 /// Fluid/lattice properties
 // number of lattice nodes along the x-axis (periodic)
-const int Nx = 220;
+const int Nx = 300;
 // number of lattice nodes along the y-axis (including two wall nodes)
 const int Ny = 62;
 // relaxation time
-const double tau = 0.525;
+const double tau = 0.6;
 // number of time steps (running from 1 to t_num)
 const int t_num = 50000;
 // disk write time step (data will be written to the disk every t_disk step)
@@ -76,20 +76,22 @@ const int t_disk = 200;
 // info time step (screen message will be printed every t_info step)
 const int t_info = 1000;
 // force density due to gravity (in positive x-direction)
-const double gravity = 0.0;
+const double gravity = 3.75e-6;
 // velocity of the bottom wall (in positive x-direction)
-const double wall_vel_bottom = 0.1;
+const double wall_vel_bottom = 0;
 // velocity of the top wall (in positive x-direction)
-const double wall_vel_top = -0.1;
+const double wall_vel_top = 0;
+
+const double u_inlet = 0.01;
 
 /// Particle properties
 
 const int particle_num_nodes = 60;  // number of surface nodes
-const double particle_radius = 8;  // radius
+const double particle_radius = 10;  // radius
 const double particle_stiffness = 1;  // stiffness modulus
 const double particle_bending = 0;  // bending modulus
-const double particle_center_x = 30;  // center position (x-component)
-const double particle_center_y = 15;  // center position (y-component)
+const double particle_center_x = 60;  // center position (x-component)
+const double particle_center_y = 30;  // center position (y-component)
 
 /// *****************
 /// DECLARE VARIABLES
@@ -107,6 +109,7 @@ std::vector<std::vector<double>> velocity_y; // fluid velocity (y-component)
 std::vector<std::vector<double>> force_x; // fluid force (x-component)
 std::vector<std::vector<double>> force_y; // fluid force (y-component)
 std::vector<double> pop_eq(9); // equilibrium populations
+std::vector<double> u_in;
 // lattice weights
 const std::vector<double> weight = {4./9.,
                                     1./9., 1./9., 1./9., 1./9.,
@@ -270,9 +273,9 @@ int main() {
   // lattice viscosity
   const double nu = (tau - 0.5) / 3;
   // expected maximum velocity for Poiseuille flow without immersed object
-  const double umax = gravity / (2 * nu) * SQ(0.5 * D);
+  const double u_avg = gravity / nu * SQ(0.5 * D) / 3;
   // Reynolds number for Poiseuille flow without immersed object
-  const double Re = D * umax / nu;
+  const double Re = 2 * particle_radius * u_avg / nu;
 
   /// Report derived parameters
 
@@ -280,7 +283,7 @@ int main() {
   cout << "=====================" << endl;
   cout << "D = " << D << endl;
   cout << "nu = " << nu << endl;
-  cout << "umax = " << umax << endl;
+  cout << "u_avg = " << u_avg << endl;
   cout << "Re = " << Re << endl;
   cout << endl;
 
@@ -357,6 +360,7 @@ void initialize() {
   velocity_y.assign(Nx, std::vector<double>(Ny, 0.0));
   force_x.assign(Nx, std::vector<double>(Ny, 0.0));
   force_y.assign(Nx, std::vector<double>(Ny, 0.0));
+  u_in.assign(Ny, u_inlet);
 
   /// Allocate memory for the populations
 
@@ -500,6 +504,28 @@ void LBM(int time) {
     pop[7][X][Ny - 2] = pop[8][(X - 1 + Nx) % Nx][Ny - 1] + 6 * weight[8] *
         density[X][Ny - 2] * wall_vel_top;
   }
+
+//  /// Inlet and outlet
+//  for (int Y = 1; Y < Ny - 1; ++Y) {
+//    // inlet
+//    pop[1][0][Y] += 6 * weight[1] * u_in[Y];
+//    pop[5][0][Y] += 6 * weight[5] * u_in[Y];
+//    pop[8][0][Y] += 6 * weight[8] * u_in[Y];
+//    pop[3][0][Y] -= 6 * weight[3] * u_in[Y];
+//    pop[6][0][Y] -= 6 * weight[6] * u_in[Y];
+//    pop[7][0][Y] -= 6 * weight[7] * u_in[Y];
+//
+//    // outlet
+//    pop[0][Nx - 1][Y] = 2 * pop[0][Nx - 2][Y] - pop[0][Nx - 3][Y];
+//    pop[1][Nx - 1][Y] = 2 * pop[1][Nx - 2][Y] - pop[1][Nx - 3][Y];
+//    pop[2][Nx - 1][Y] = 2 * pop[2][Nx - 2][Y] - pop[2][Nx - 3][Y];
+//    pop[3][Nx - 1][Y] = 2 * pop[3][Nx - 2][Y] - pop[3][Nx - 3][Y];
+//    pop[4][Nx - 1][Y] = 2 * pop[4][Nx - 2][Y] - pop[4][Nx - 3][Y];
+//    pop[5][Nx - 1][Y] = 2 * pop[5][Nx - 2][Y] - pop[5][Nx - 3][Y];
+//    pop[6][Nx - 1][Y] = 2 * pop[6][Nx - 2][Y] - pop[6][Nx - 3][Y];
+//    pop[7][Nx - 1][Y] = 2 * pop[7][Nx - 2][Y] - pop[7][Nx - 3][Y];
+//    pop[8][Nx - 1][Y] = 2 * pop[8][Nx - 2][Y] - pop[8][Nx - 3][Y];
+//  }
 
   /// Compute fluid density and velocity
   // The fluid density and velocity are obtained from the populations.
