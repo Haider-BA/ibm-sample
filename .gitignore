@@ -5,3 +5,4 @@ bin/
 obj/
 vtk_fluid/
 vtk_particle/
+*.dat
