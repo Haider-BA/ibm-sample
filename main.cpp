@@ -68,17 +68,21 @@ const int t_num = 50000; // number of time steps (running from 1 to t_num)
 const int t_disk = 200; // disk write time step (data will be written to the disk every t_disk step)
 const int t_info = 1000; // info time step (screen message will be printed every t_info step)
 const double gravity = 0.00000; // force density due to gravity (in positive x-direction)
-const double wall_vel_bottom = 0.2; // velocity of the bottom wall (in positive x-direction)
+const double wall_vel_bottom = 0.1; // velocity of the bottom wall (in positive x-direction)
 const double wall_vel_top = -wall_vel_bottom; // velocity of the top wall (in positive x-direction)
+const bool can_move = false;
 
 /// Particle properties
 
 const int particle_num_nodes = 60; // number of surface nodes
-const double particle_radius = 8; // radius
+const double particle_radius = 3.75; // radius
 const double particle_stiffness = 2.0; // stiffness modulus
 const double particle_bending = 0; // bending modulus
-const double particle_center_x = 30; // center position (x-component)
-const double particle_center_y = 15; // center position (y-component)
+const double particle_center_x = Nx / 2; // center position (x-component)
+const double particle_center_y = Ny / 4 - 1; // center position (y-component)
+const double particle_torque = 0.0;  // particle initial torque;
+double torque = 0.0;
+double ang_vel = 0.0;
 
 /// *****************
 /// DECLARE VARIABLES
@@ -148,6 +152,7 @@ struct particle_struct {
     center.x_ref = particle_center_x;
     center.y_ref = particle_center_y;
     node = new node_struct[num_nodes];
+//    torque = particle_torque;
 
     // The initial shape of the object is set in the following.
     // For a cylinder (rigid or deformable), the nodes define a circle.
@@ -190,6 +195,7 @@ struct particle_struct {
   double stiffness; // stiffness modulus
   node_struct center; // center node
   node_struct *node; // list of nodes
+//  double torque;
 };
 
 /// *****************
@@ -509,6 +515,7 @@ void compute_particle_forces(particle_struct particle, int time) {
     particle.node[n].force_x = 0;
     particle.node[n].force_y = 0;
   }
+  torque = 0.0;
 
   /// Compute strain forces
   // The strain forces are proportional to the relative displacement of a node with respect to its two neighbors.
@@ -672,7 +679,12 @@ void compute_particle_forces(particle_struct particle, int time) {
     for(int n = 0; n < particle.num_nodes; ++n) {
       particle.node[n].force_x += -particle.stiffness * (particle.node[n].x - particle.node[n].x_ref) * area;
       particle.node[n].force_y += -particle.stiffness * (particle.node[n].y - particle.node[n].y_ref) * area;
+      const auto x_d = particle.node[n].x - particle.center.x;
+      const auto y_d = particle.node[n].y - particle.center.y;
+      torque += x_d * -particle.node[n].force_y - y_d * -particle.node[n].force_x;
     }
+//    std::cout << particle.torque << std::endl;
+
   #endif
 
   return;
@@ -815,13 +827,31 @@ void update_particle_position(particle_struct particle) {
     particle.center.x += particle.node[n].x / particle.num_nodes;
     particle.center.y += particle.node[n].y / particle.num_nodes;
   }
-  particle.center.x_ref = particle.center.x;
-  particle.center.y_ref = particle.center.y;
+  if (can_move) {
+    particle.center.x_ref = particle.center.x;
+    particle.center.y_ref = particle.center.y;
+    for(int n = 0; n < particle.num_nodes; ++n) {
+      particle.node[n].x_ref = particle.center.x_ref + particle.radius * sin(2. *
+          M_PI * (double) n / particle.num_nodes);
+      particle.node[n].y_ref = particle.center.y_ref + particle.radius * cos(2. *
+          M_PI * (double) n / particle.num_nodes);
+    }
+//    for (int n = 0; n < particle.num_nodes; ++n) {
+//      particle.node[n].x += particle.node[n].vel_x;
+//      particle.node[n].y += particle.node[n].vel_y;
+//    }
+  }
+  ang_vel -= torque / particle_radius / particle_radius / 2;
+  const auto angle = fabs(ang_vel);
+  const auto dir = ang_vel / fabs(ang_vel);
   for(int n = 0; n < particle.num_nodes; ++n) {
-    particle.node[n].x_ref = particle.center.x_ref + particle.radius * sin(2. *
-        M_PI * (double) n / particle.num_nodes);
-    particle.node[n].y_ref = particle.center.y_ref + particle.radius * cos(2. *
-        M_PI * (double) n / particle.num_nodes);
+    const auto old_x = particle.node[n].x_ref - particle.center.x_ref;
+    const auto old_y = particle.node[n].y_ref - particle.center.y_ref;
+    const auto mov_x = cos(angle) * old_x - dir * sin(angle) * old_y;
+    const auto mov_y = dir * sin(angle) * old_x + cos(angle) * old_y;
+    std::cout << mov_x << std::endl;
+//    particle.node[n].x_ref = mov_x + particle.center.x_ref;
+//    particle.node[n].y_ref = mov_y + particle.center.y_ref;
   }
 
   /// Check for periodicity along the x-axis
@@ -834,15 +864,16 @@ void update_particle_position(particle_struct particle) {
     particle.center.x -= Nx;
     for (int n = 0; n < particle.num_nodes; ++n) particle.node[n].x -= Nx;
   }
-  if (particle.center.x_ref < 0) {
-    particle.center.x_ref += Nx;
-    for (int n = 0; n < particle.num_nodes; ++n) particle.node[n].x_ref += Nx;
+  if (can_move) {
+    if (particle.center.x_ref < 0) {
+      particle.center.x_ref += Nx;
+      for (int n = 0; n < particle.num_nodes; ++n) particle.node[n].x_ref += Nx;
+    }
+    else if (particle.center.x_ref >= Nx) {
+      particle.center.x_ref -= Nx;
+      for (int n = 0; n < particle.num_nodes; ++n) particle.node[n].x_ref -= Nx;
+    }
   }
-  else if (particle.center.x_ref >= Nx) {
-    particle.center.x_ref -= Nx;
-    for (int n = 0; n < particle.num_nodes; ++n) particle.node[n].x_ref -= Nx;
-  }
-
   return;
 }
 
