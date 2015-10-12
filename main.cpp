@@ -14,33 +14,33 @@
 // x:       0 +1 -1  0  0 +1 -1 +1 -1
 // y:       0  0  0 +1 -1 +1 -1 -1 +1
 //
-// 8 3 5  ^y
-//  \|/   |   x
-// 2-0-1   --->
-//  /|\
-// 6 4 7
+// 8  3  5  ^y
+//  \ | /   |   x
+// 2- 0 -1   --->
+//  / | \
+// 6  4  7
 
 /// *********************
 /// PREPROCESSOR COMMANDS
 /// *********************
-
-#include <vector> // vector containers
 #include <cmath> // mathematical library
-#include <iostream> // for the use of 'cout'
-#include <fstream> // file streams
-#include <sstream> // string streams
 #include <cstdlib> // standard library
-#define SQ(x) ((x) * (x)) // square function; replaces SQ(x) by ((x) * (x)) in the code
+#include <fstream> // file streams
+#include <iostream> // for the use of 'cout'
+#include <sstream> // string streams
+#include <vector> // vector containers
+// square function; replaces SQ(x) by ((x) * (x)) in the code
+#define SQ(x) ((x) * (x))
 
 using namespace std; // permanently use the standard namespace
 
 /// *********************
 /// SIMULATION PARAMETERS
 /// *********************
-
 // These are the relevant simulation parameters.
 // They can be changed by the user.
-// If a bottom or top wall shall move in negative x-direction, a negative velocity has to be specified.
+// If a bottom or top wall shall move in negative x-direction,
+// a negative velocity has to be specified.
 // Moving walls and gravity can be switched on simultaneously.
 
 /// Simulation types
@@ -59,21 +59,29 @@ using namespace std; // permanently use the standard namespace
 //#define DEFORMABLE_CYLINDER
 //#define DEFORMABLE_RBC
 
+const static double M_PI = 3.14159265;
 /// Fluid/lattice properties
-
-const int Nx = 220; // number of lattice nodes along the x-axis (periodic)
-const int Ny = 62; // number of lattice nodes along the y-axis (including two wall nodes)
-const double tau = 0.6; // relaxation time
-const int t_num = 50000; // number of time steps (running from 1 to t_num)
-const int t_disk = 200; // disk write time step (data will be written to the disk every t_disk step)
-const int t_info = 1000; // info time step (screen message will be printed every t_info step)
-const double gravity = 0.00000; // force density due to gravity (in positive x-direction)
-const double wall_vel_bottom = 0.1; // velocity of the bottom wall (in positive x-direction)
-const double wall_vel_top = -wall_vel_bottom; // velocity of the top wall (in positive x-direction)
+// number of lattice nodes along the x-axis (periodic)
+const int Nx = 220;
+// number of lattice nodes along the y-axis (including two wall nodes)
+const int Ny = 62;
+// relaxation time
+const double tau = 0.6;
+// number of time steps (running from 1 to t_num)
+const int t_num = 50000;
+// disk write time step (data will be written to the disk every t_disk step)
+const int t_disk = 200;
+// info time step (screen message will be printed every t_info step)
+const int t_info = 1000;
+// force density due to gravity (in positive x-direction)
+const double gravity = 0.00000;
+// velocity of the bottom wall (in positive x-direction)
+const double wall_vel_bottom = 0.1;
+// velocity of the top wall (in positive x-direction)
+const double wall_vel_top = -wall_vel_bottom;
 const bool can_move = false;
 
 /// Particle properties
-
 const int particle_num_nodes = 60; // number of surface nodes
 const double particle_radius = 3.75; // radius
 const double particle_stiffness = 2.0; // stiffness modulus
@@ -87,42 +95,38 @@ double ang_vel = 0.0;
 /// *****************
 /// DECLARE VARIABLES
 /// *****************
-
-// The following code should not be modified when it is first used.
-
-const double omega = 1. / tau; // relaxation frequency (inverse of relaxation time)
-double ***pop, ***pop_old; // LBM populations (old and new)
+// relaxation frequency (inverse of relaxation time)
+const double omega = 1. / tau;
+double ***pop;
+double ***pop_old; // LBM populations (old and new)
 double **density; // fluid density
 double **velocity_x; // fluid velocity (x-component)
 double **velocity_y; // fluid velocity (y-component)
 double **force_x; // fluid force (x-component)
 double **force_y; // fluid force (y-component)
-double pop_eq[9]; // equilibrium populations
-const double weight[9] = {4./9., 1./9., 1./9., 1./9., 1./9., 1./36., 1./36., 1./36., 1./36.}; // lattice weights
+std::vector<double> pop_eq(9); // equilibrium populations
+const std::vector<double> weight = {4.0 / 9.0,
+    1.0 / 9.0, 1.0 / 9.0, 1.0 / 9.0, 1.0 / 9.0,
+    1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0}; // lattice weights
 
 /// ******************
 /// PARTICLE STRUCTURE
 /// ******************
-
 // The following code handles the object immersed in the flow.
 // In the present implementation, only a single object can be put into the flow.
-
 /// Structure for surface nodes
 // Each node has a current x- and y-position and a reference x- and y-position.
-
-struct node_struct {
-
+struct Node {
   /// Constructor
-
-  node_struct() {
-   x = 0;
-   y = 0;
-   x_ref = 0;
-   y_ref = 0;
-   vel_x = 0;
-   vel_y = 0;
-   force_x = 0;
-   force_y = 0;
+  Node() {
+    x = 0;
+    y = 0;
+    x_ref = 0;
+    y_ref = 0;
+    vel_x = 0;
+    vel_y = 0;
+    force_x = 0;
+    force_y = 0;
   }
 
   /// Elements
@@ -139,11 +143,9 @@ struct node_struct {
 
 /// Structure for object (either cylinder or red blood cell)
 
-struct particle_struct {
-
+struct Particle {
   /// Constructor
-
-  particle_struct() {
+  Particle() {
     num_nodes = particle_num_nodes;
     radius = particle_radius;
     stiffness = particle_stiffness;
@@ -151,107 +153,114 @@ struct particle_struct {
     center.y = particle_center_y;
     center.x_ref = particle_center_x;
     center.y_ref = particle_center_y;
-    node = new node_struct[num_nodes];
-//    torque = particle_torque;
+    node = new Node[num_nodes];
 
     // The initial shape of the object is set in the following.
     // For a cylinder (rigid or deformable), the nodes define a circle.
-    // For a red blood cell, the y-position has to be changed in order to describe a red blood cell.
-    // Initially, the current node positions and reference node positions are identical.
-    // During the simulation, only the current positions are updated,
-    // the reference node positions are fixed.
-
-    for(int n = 0; n < num_nodes; ++n) {
+    // For a red blood cell, the y-position has to be changed in order to
+    // describe a red blood cell. Initially, the current node positions and
+    // reference node positions are identical. During the simulation, only the
+    // current positions are updated, the reference node positions are fixed.
+    for (int n = 0; n < num_nodes; ++n) {
+      auto theta = 2. * M_PI * (double) n / num_nodes;
       #if defined RIGID_CYLINDER || defined DEFORMABLE_CYLINDER
-        node[n].x = center.x + radius * sin(2. * M_PI * (double) n / num_nodes);
-        node[n].x_ref = center.x + radius * sin(2. * M_PI * (double) n / num_nodes);
-        node[n].y = center.y + radius * cos(2. * M_PI * (double) n / num_nodes);
-        node[n].y_ref = center.y + radius * cos(2. * M_PI * (double) n / num_nodes);
+        node[n].x = center.x + radius * sin(theta);
+        node[n].x_ref = center.x + radius * sin(theta);
+        node[n].y = center.y + radius * cos(theta);
+        node[n].y_ref = center.y + radius * cos(theta);
       #endif
-
       #ifdef DEFORMABLE_RBC
-        node[n].x = center.x + radius * sin(2. * M_PI * (double) n / num_nodes);
-        node[n].x_ref = center.x + radius * sin(2. * M_PI * (double) n / num_nodes);
-        node[n].y = radius * cos(2. * M_PI * (double) n / num_nodes);
-
+        node[n].x = center.x + radius * sin(theta);
+        node[n].x_ref = center.x + radius * sin(theta);
+        node[n].y = radius * cos(theta);
+        x_sqr = SQ((center.x - node[n].x) / radius);
+        outer_point = sqrt(1 - x_sqr) * (0.207 + 2.00 * x_sqr - 1.12 *
+            SQ(x_sqr)) * radius / 2;
         // Parametrization of the red blood cell shape in 2D
-
-        if(node[n].y > 0) {
-          node[n].y = center.y + sqrt(1 - SQ((center.x - node[n].x) / radius)) * (0.207 + 2.00 * SQ((center.x - node[n].x) / radius) - 1.12 * SQ(SQ((center.x - node[n].x) / radius))) * radius / 2;
-          node[n].y_ref = center.y + sqrt(1 - SQ((center.x - node[n].x) / radius)) * (0.207 + 2.00 * SQ((center.x - node[n].x) / radius) - 1.12 * SQ(SQ((center.x - node[n].x) / radius))) * radius / 2;
+        if (node[n].y > 0) {
+          node[n].y = center.y + outer_point;
+          node[n].y_ref = center.y + outer_point;
         }
         else {
-          node[n].y = center.y - sqrt(1 - SQ((center.x - node[n].x) / radius)) * (0.207 + 2.00 * SQ((center.x - node[n].x) / radius) - 1.12 * SQ(SQ((center.x - node[n].x) / radius))) * radius / 2;
-          node[n].y_ref = center.y - sqrt(1 - SQ((center.x - node[n].x) / radius)) * (0.207 + 2.00 * SQ((center.x - node[n].x) / radius) - 1.12 * SQ(SQ((center.x - node[n].x) / radius))) * radius / 2;
+          node[n].y = center.y - outer_point;
+          node[n].y_ref = center.y - outer_point;
         }
       #endif
-    }
+    }  // n
   }
-
   /// Elements
-
   int num_nodes; // number of surface nodes
   double radius; // object radius
   double stiffness; // stiffness modulus
-  node_struct center; // center node
-  node_struct *node; // list of nodes
+  Node center; // center node
+  Node *node; // list of nodes
 //  double torque;
 };
-
 /// *****************
 /// DECLARE FUNCTIONS
 /// *****************
-
 // The following functions are used in the simulation code.
-
-void initialize(); // allocate memory and initialize variables
-void LBM(int); // perform LBM operations
-void momenta(); // compute fluid density and velocity from the populations
-void equilibrium(double, double, double); // compute the equilibrium populations from the fluid density and velocity
-void compute_particle_forces(particle_struct, int); // compute the forces acting on the object nodes
-void spread(particle_struct); // spread node forces to fluid lattice
-void interpolate(particle_struct); // interpolate node velocities from fluid velocity
-void update_particle_position(particle_struct); // update object center position
-void write_fluid_vtk(int); // write the fluid state to the disk as VTK file
-void write_particle_vtk(int, particle_struct); // write the particle state to the disk as VTK file
-void write_data(int, particle_struct); // write data to the disk (drag/lift, center position)
+// allocate memory and initialize variables
+void Initialize();
+// perform LBM operations
+void LatticeBoltzmannMethod(int time);
+// compute fluid density and velocity from the populations
+void ComputeMacroscopicProperties();
+// compute the equilibrium populations from the fluid density and velocity
+void ComputeEquilibrium(double den
+  , double vel_x
+  , double vel_y);
+// compute the forces acting on the object nodes
+void ComputeParticleForces(Particle particle
+  , int time);
+// spread node forces to fluid lattice
+void SpreadForce(Particle particle);
+// interpolate node velocities from fluid velocity
+void InterpolateVelocity(Particle particle);
+// update object center position
+void UpdateParticlePosition(Particle particle);
+// write the fluid state to the disk as VTK file
+void WriteFluidVTK(int time);
+// write the particle state to the disk as VTK file
+void WriteParticleVTK(int time
+  , Particle particle);
+// write data to the disk (drag/lift, center position)
+void WriteData(int time
+  , Particle particle);
 
 /// *************
 /// MAIN FUNCTION
 /// *************
-
-// This is the main function, containing the simulation initialization and the simulation loop.
-
+// This is the main function, containing the simulation initialization and the
+// simulation loop.
 int main() {
-
   /// ************
   /// PREPARATIONS
   /// ************
-
-  initialize(); // allocate memory and initialize variables
-  particle_struct particle; // create immersed object
-
+  Initialize(); // allocate memory and initialize variables
+  Particle particle; // create immersed object
   /// Compute derived quantities
-
-  const double D = Ny - 2; // inner channel diameter
-  const double nu = (tau - 0.5) / 3; // lattice viscosity
-  const double umax = gravity / (2 * nu) * SQ(0.5 * D); // expected maximum velocity for Poiseuille flow without immersed object
-  const double Re = D * umax / nu; // Reynolds number for Poiseuille flow without immersed object
+  // inner channel diameter
+  const double D = Ny - 2;
+  // lattice viscosity
+  const double nu = (tau - 0.5) / 3;
+  // expected maximum velocity for Poiseuille flow without immersed object
+  const double umax = gravity / (2 * nu) * SQ(0.5 * D);
+  // Reynolds number for Poiseuille flow without immersed object
+  const double Re = D * umax / nu;
 
   /// Report derived parameters
-
-  cout << "simulation parameters" << endl;
-  cout << "=====================" << endl;
-  cout << "D = " << D << endl;
-  cout << "nu = " << nu << endl;
-  cout << "umax = " << umax << endl;
-  cout << "Re = " << Re << endl;
-  cout << endl;
+  std::cout << "simulation parameters" << std::endl;
+  std::cout << "=====================" << std::endl;
+  std::cout << "D = " << D << std::endl;
+  std::cout << "nu = " << nu << std::endl;
+  std::cout << "umax = " << umax << std::endl;
+  std::cout << "Re = " << Re << std::endl;
+  std::cout << std::endl;
 
   /// ***************
   /// SIMULATION LOOP
   /// ***************
-
   // Overview of simulation algorithm:
   // 1) compute the node forces based on the object's deformation
   // 2) spread the node forces to the fluid lattice
@@ -259,144 +268,120 @@ int main() {
   // 4) interpolate the fluid velocity to the object nodes
   // 5) update node positions and object's center
   // 6) if desired, write data to disk and report status
-
-  cout << "starting simulation" << endl;
-
-  srand(1);
-
-  for(int t = 1; t <= t_num; ++t) { // run over all times between 1 and t_num
-
-    compute_particle_forces(particle, t); // compute particle forces
-    spread(particle); // spread forces from the Lagrangian to the Eulerian mesh
-    LBM(t); // perform collision, propagation, and bounce-back
-    interpolate(particle); // interpolate velocity
-    update_particle_position(particle); // update particle position
-
+  std::cout << "starting simulation" << std::endl;
+//  srand(1);
+  // run over all times between 1 and t_num
+  for (int t = 1; t <= t_num; ++t) {
+    ComputeParticleForces(particle, t);
+    SpreadForce(particle);
+    LatticeBoltzmannMethod(t);
+    InterpolateVelocity(particle);
+    UpdateParticlePosition(particle);
     /// Write fluid and particle to VTK files
     // The data is only written each t_info time step.
-    if(t % t_disk == 0) {
-      write_fluid_vtk(t);
-      write_particle_vtk(t, particle);
-      write_data(t, particle);
+    if (t % t_disk == 0) {
+      WriteFluidVTK(t);
+      WriteParticleVTK(t, particle);
+      WriteData(t, particle);
     }
-
-    /// Report end of time step
-
-    if(t % t_info == 0) {
-      cout << "completed time step " << t << " in [1, " << t_num << "]" << endl;
-    }
-  }
-
-  /// Report successful end of simulation
-
-  cout << "simulation complete" << endl;
-
+    if(t % t_info == 0) std::cout << t << " in " << t_num << std::endl;
+  }  // t
+  std::cout << "simulation complete" << std::endl;
   return 0;
 } // end of main function
 
 /// ****************************************
 /// ALLOCATE MEMORY AND INITIALIZE VARIABLES
 /// ****************************************
-
-// The memory for lattice variables (populations, density, velocity, forces) is allocated.
-// The variables are initialized.
-
-void initialize() {
-
+// The memory for lattice variables (populations, density, velocity, forces) is
+// allocated. The variables are initialized.
+void Initialize() {
   /// Create folders, delete data file
   // Make sure that the VTK folders exist.
   // Old file data.dat is deleted, if existing.
-
   int ignore; // ignore return value of system calls
   ignore = system("mkdir -p vtk_fluid"); // create folder if not existing
   ignore = system("mkdir -p vtk_particle"); // create folder if not existing
   ignore = system("rm -f data.dat"); // delete file if existing
 
   /// Allocate memory for the fluid density, velocity, and force
-
   density = new double*[Nx];
   velocity_x = new double*[Nx];
   velocity_y = new double*[Nx];
   force_x = new double*[Nx];
   force_y = new double*[Nx];
 
-  for(int X = 0; X < Nx; ++X) {
+  for (int X = 0; X < Nx; ++X) {
     density[X] = new double[Ny];
     velocity_x[X] = new double[Ny];
     velocity_y[X] = new double[Ny];
     force_x[X] = new double[Ny];
     force_y[X] = new double[Ny];
-  }
+  }  // X
 
   /// Initialize the fluid density and velocity
   // Start with unit density and zero velocity.
-
-  for(int X = 0; X < Nx; ++X) {
-    for(int Y = 0; Y < Ny; ++Y) {
+  for (int X = 0; X < Nx; ++X) {
+    for (int Y = 0; Y < Ny; ++Y) {
       density[X][Y] = 1;
       velocity_x[X][Y] = 0;
       velocity_y[X][Y] = 0;
       force_x[X][Y] = 0;
       force_y[X][Y] = 0;
-    }
-  }
+    }  // Y
+  }  // X
 
   /// Allocate memory for the populations
-
   pop = new double**[9];
   pop_old = new double**[9];
 
-  for(int c_i = 0; c_i < 9; ++c_i) {
-    pop[c_i] = new double*[Nx];
-    pop_old[c_i] = new double*[Nx];
-
-    for(int X = 0; X < Nx; ++X) {
-      pop[c_i][X] = new double[Ny];
-      pop_old[c_i][X] = new double[Ny];
-
-      for(int Y = 0; Y < Ny; ++Y) {
-        pop[c_i][X][Y] = 0;
-        pop_old[c_i][X][Y] = 0;
-      }
-    }
-  }
+  for (int i = 0; i < 9; ++i) {
+    pop[i] = new double*[Nx];
+    pop_old[i] = new double*[Nx];
+    for (int X = 0; X < Nx; ++X) {
+      pop[i][X] = new double[Ny];
+      pop_old[i][X] = new double[Ny];
+      for (int Y = 0; Y < Ny; ++Y) {
+        pop[i][X][Y] = 0;
+        pop_old[i][X][Y] = 0;
+      }  // Y
+    }  // X
+  }  // i
 
   /// Initialize the populations
-  // Use the equilibrium populations corresponding to the initialized fluid density and velocity.
-
-  for(int X = 0; X < Nx; ++X) {
-    for(int Y = 0; Y < Ny; ++Y) {
-      equilibrium(density[X][Y], velocity_x[X][Y], velocity_y[X][Y]);
-
-      for(int c_i = 0; c_i < 9; ++c_i) {
-        pop_old[c_i][X][Y] = pop_eq[c_i];
-        pop[c_i][X][Y] = pop_eq[c_i];
-      }
-    }
-  }
-
+  // Use the equilibrium populations corresponding to the initialized fluid
+  // density and velocity.
+  for (int X = 0; X < Nx; ++X) {
+    for (int Y = 0; Y < Ny; ++Y) {
+      ComputeEquilibrium(density[X][Y], velocity_x[X][Y], velocity_y[X][Y]);
+      for (int i = 0; i < 9; ++i) {
+        pop_old[i][X][Y] = pop_eq[i];
+        pop[i][X][Y] = pop_eq[i];
+      }  // i
+    }  // Y
+  }  // X
   return;
 }
 
 /// *******************
 /// COMPUTE EQUILIBRIUM
 /// *******************
-
 // This function computes the equilibrium populations from the fluid density and velocity.
 // It computes the equilibrium only at a specific lattice node: Function has to be called at each lattice node.
 // The standard quadratic euilibrium is used.
-// reminder: SQ(x) = x * x
-
-void equilibrium(double den, double vel_x, double vel_y) {
-  pop_eq[0] = weight[0] * den * (1                                                     - 1.5 * (SQ(vel_x) + SQ(vel_y)));
-  pop_eq[1] = weight[1] * den * (1 + 3 * (  vel_x        ) + 4.5 * SQ(  vel_x        ) - 1.5 * (SQ(vel_x) + SQ(vel_y)));
-  pop_eq[2] = weight[2] * den * (1 + 3 * (- vel_x        ) + 4.5 * SQ(- vel_x        ) - 1.5 * (SQ(vel_x) + SQ(vel_y)));
-  pop_eq[3] = weight[3] * den * (1 + 3 * (          vel_y) + 4.5 * SQ(          vel_y) - 1.5 * (SQ(vel_x) + SQ(vel_y)));
-  pop_eq[4] = weight[4] * den * (1 + 3 * (        - vel_y) + 4.5 * SQ(        - vel_y) - 1.5 * (SQ(vel_x) + SQ(vel_y)));
-  pop_eq[5] = weight[5] * den * (1 + 3 * (  vel_x + vel_y) + 4.5 * SQ(  vel_x + vel_y) - 1.5 * (SQ(vel_x) + SQ(vel_y)));
-  pop_eq[6] = weight[6] * den * (1 + 3 * (- vel_x - vel_y) + 4.5 * SQ(- vel_x - vel_y) - 1.5 * (SQ(vel_x) + SQ(vel_y)));
-  pop_eq[7] = weight[7] * den * (1 + 3 * (  vel_x - vel_y) + 4.5 * SQ(  vel_x - vel_y) - 1.5 * (SQ(vel_x) + SQ(vel_y)));
-  pop_eq[8] = weight[8] * den * (1 + 3 * (- vel_x + vel_y) + 4.5 * SQ(- vel_x + vel_y) - 1.5 * (SQ(vel_x) + SQ(vel_y)));
+void ComputeEquilibrium(double den
+  , double vel_x
+  , double vel_y) {
+  const auto u_sqr = 1.5 * SQ(vel_x) + SQ(vel_y);
+  pop_eq[0] = weight[0] * den * (1                                                     - u_sqr);
+  pop_eq[1] = weight[1] * den * (1 + 3 * (  vel_x        ) + 4.5 * SQ(  vel_x        ) - u_sqr);
+  pop_eq[2] = weight[2] * den * (1 + 3 * (- vel_x        ) + 4.5 * SQ(- vel_x        ) - u_sqr);
+  pop_eq[3] = weight[3] * den * (1 + 3 * (          vel_y) + 4.5 * SQ(          vel_y) - u_sqr);
+  pop_eq[4] = weight[4] * den * (1 + 3 * (        - vel_y) + 4.5 * SQ(        - vel_y) - u_sqr);
+  pop_eq[5] = weight[5] * den * (1 + 3 * (  vel_x + vel_y) + 4.5 * SQ(  vel_x + vel_y) - u_sqr);
+  pop_eq[6] = weight[6] * den * (1 + 3 * (- vel_x - vel_y) + 4.5 * SQ(- vel_x - vel_y) - u_sqr);
+  pop_eq[7] = weight[7] * den * (1 + 3 * (  vel_x - vel_y) + 4.5 * SQ(  vel_x - vel_y) - u_sqr);
+  pop_eq[8] = weight[8] * den * (1 + 3 * (- vel_x + vel_y) + 4.5 * SQ(- vel_x + vel_y) - u_sqr);
 
   return;
 }
@@ -405,38 +390,33 @@ void equilibrium(double den, double vel_x, double vel_y) {
 /// PERFORM LBM OPERATIONS
 /// **********************
 
-void LBM(int time) {
-
+void LatticeBoltzmannMethod(int time) {
   /// Swap populations
   // The present code used old and new populations which are swapped at the beginning of each time step.
   // This is sometimes called 'double-buffered' or 'ping-pong' algorithm.
   // This way, the old populations are not overwritten during propagation.
   // The resulting code is easier to write and to debug.
   // The memory requirement for the populations is twice as large.
-
   double ***swap_temp = pop_old;
   pop_old = pop;
   pop = swap_temp;
-
   /// Lattice Boltzmann equation
   // The lattice Boltzmann equation is solved in the following.
   // The algorithm includes
   // - computation of the lattice force
   // - combined collision and propagation (faster than first collision and then propagation)
-
-  for(int X = 0; X < Nx; ++X) {
-    for(int Y = 1; Y < Ny - 1; ++Y) {
-
+  for (int X = 0; X < Nx; ++X) {
+    for (int Y = 1; Y < Ny - 1; ++Y) {
       /// Compute equilibrium
       // The equilibrium populations are computed.
       // Forces are coupled via Shan-Chen velocity shift.
-
-      equilibrium(density[X][Y], (velocity_x[X][Y] + (force_x[X][Y] + gravity) * tau / density[X][Y]), (velocity_y[X][Y] + (force_y[X][Y]) * tau / density[X][Y]));
-
+      ComputeEquilibrium(density[X][Y]
+        , (velocity_x[X][Y] + (force_x[X][Y] + gravity) * tau / density[X][Y])
+        , (velocity_y[X][Y] + (force_y[X][Y]) * tau / density[X][Y]));
       /// Compute new populations
-      // This is the lattice Boltzmann equation (combined collision and propagation) including external forcing.
-      // Periodicity of the lattice in x-direction is taken into account by the %-operator.
-
+      // This is the lattice Boltzmann equation (combined collision and
+      // propagation) including external forcing. Periodicity of the lattice in
+      // x-direction is taken into account by the %-operator.
       pop[0][X]                [Y]     = pop_old[0][X][Y] * (1 - omega) + pop_eq[0] * omega;
       pop[1][(X + 1) % Nx]     [Y]     = pop_old[1][X][Y] * (1 - omega) + pop_eq[1] * omega;
       pop[2][(X - 1 + Nx) % Nx][Y]     = pop_old[2][X][Y] * (1 - omega) + pop_eq[2] * omega;
@@ -446,46 +426,35 @@ void LBM(int time) {
       pop[6][(X - 1 + Nx) % Nx][Y - 1] = pop_old[6][X][Y] * (1 - omega) + pop_eq[6] * omega;
       pop[7][(X + 1) % Nx]     [Y - 1] = pop_old[7][X][Y] * (1 - omega) + pop_eq[7] * omega;
       pop[8][(X - 1 + Nx) % Nx][Y + 1] = pop_old[8][X][Y] * (1 - omega) + pop_eq[8] * omega;
-    }
-  }
-
+    }  // Y
+  }  // X
   /// Bounce-back
-  // Due to the presence of the rigid walls at y = 0 and y = Ny - 1, the populations have to be bounced back.
-  // Ladd's momentum correction term is included for moving walls (wall velocity parallel to x-axis).
-  // Periodicity of the lattice in x-direction is taken into account via the %-operator.
-
-  for(int X = 0; X < Nx; ++X) {
-
+  // Due to the presence of the rigid walls at y = 0 and y = Ny - 1, the
+  // populations have to be bounced back. Ladd's momentum correction term is
+  // included for moving walls (wall velocity parallel to x-axis). Periodicity
+  // of the lattice in x-direction is taken into account via the %-operator.
+  for (int X = 0; X < Nx; ++X) {
     /// Bottom wall (y = 0)
-
     pop[3][X][1] = pop[4][X]                [0];
     pop[5][X][1] = pop[6][(X - 1 + Nx) % Nx][0] + 6 * weight[6] * density[X][1] * wall_vel_bottom;
     pop[8][X][1] = pop[7][(X + 1) % Nx]     [0] - 6 * weight[7] * density[X][1] * wall_vel_bottom;
-
     /// Top wall (y = Ny - 1)
-
     pop[4][X][Ny - 2] = pop[3][X]                [Ny - 1];
     pop[6][X][Ny - 2] = pop[5][(X + 1) % Nx]     [Ny - 1] - 6 * weight[5] * density[X][Ny - 2] * wall_vel_top;
     pop[7][X][Ny - 2] = pop[8][(X - 1 + Nx) % Nx][Ny - 1] + 6 * weight[8] * density[X][Ny - 2] * wall_vel_top;
-  }
-
-  /// Compute fluid density and velocity
-  // The fluid density and velocity are obtained from the populations.
-
-  momenta();
-
+  }  // X
+  ComputeMacroscopicProperties();
   return;
 }
 
 /// **********************************
 /// COMPUTE FLUID DENSITY AND VELOCITY
 /// **********************************
-
 // This function computes the fluid density and velocity from the populations.
 // The velocity correction due to body force is not included here.
 // It must be taken into account whenever the physical velocity is required.
 
-void momenta() {
+void ComputeMacroscopicProperties() {
   for(int X = 0; X < Nx; ++X) {
     for(int Y = 1; Y < Ny - 1; ++Y) {
       density[X][Y] = pop[0][X][Y] + pop[1][X][Y] + pop[2][X][Y] + pop[3][X][Y] + pop[4][X][Y] + pop[5][X][Y] + pop[6][X][Y] + pop[7][X][Y] + pop[8][X][Y];
@@ -505,7 +474,7 @@ void momenta() {
 // Depending on the simulation type (rigid/deformable cylinder or red blood cell),
 // the force computation is different.
 
-void compute_particle_forces(particle_struct particle, int time) {
+void ComputeParticleForces(Particle particle, int time) {
 
   /// Reset forces
   // This way, the force from the previous time step is deleted.
@@ -698,7 +667,7 @@ void compute_particle_forces(particle_struct particle, int time) {
 // The two-point interpolation stencil (bi-linear interpolation) is used in the present code.
 // It may be replaced by a higher-order interpolation.
 
-void spread(particle_struct particle) {
+void SpreadForce(Particle particle) {
 
   /// Reset forces
   // This is necessary since '+=' is used afterwards.
@@ -758,7 +727,7 @@ void spread(particle_struct particle) {
 // The two-point interpolation stencil (bi-linear interpolation) is used in the present code.
 // It may be replaced by a higher-order interpolation.
 
-void interpolate(particle_struct particle) {
+void InterpolateVelocity(Particle particle) {
 
   // Run over all object nodes.
 
@@ -812,7 +781,7 @@ void interpolate(particle_struct particle) {
 // Periodicity is taken into account:
 // If the particle center leaves the system domain (x < 0 or x >= Nx), it reenters from the other side.
 
-void update_particle_position(particle_struct particle) {
+void UpdateParticlePosition(Particle particle) {
 
   /// Reset center position
 
@@ -849,7 +818,7 @@ void update_particle_position(particle_struct particle) {
     const auto old_y = particle.node[n].y_ref - particle.center.y_ref;
     const auto mov_x = cos(angle) * old_x - dir * sin(angle) * old_y;
     const auto mov_y = dir * sin(angle) * old_x + cos(angle) * old_y;
-    std::cout << mov_x << std::endl;
+//    std::cout << mov_x << std::endl;
 //    particle.node[n].x_ref = mov_x + particle.center.x_ref;
 //    particle.node[n].y_ref = mov_y + particle.center.y_ref;
   }
@@ -888,13 +857,13 @@ void update_particle_position(particle_struct particle) {
 // - y-component of velocity
 // The following code is designed in such a way that the file can be read by ParaView.
 
-void write_fluid_vtk(int time) {
+void WriteFluidVTK(int time) {
 
   /// Create filename
 
-  stringstream output_filename;
+  std::stringstream output_filename;
   output_filename << "vtk_fluid/fluid_t" << time << ".vtk";
-  ofstream output_file;
+  std::ofstream output_file;
 
   /// Open file
 
@@ -960,13 +929,13 @@ void write_fluid_vtk(int time) {
 // The particle state (node positions) is writen to a VTK file at each t_disk step.
 // The following code is designed in such a way that the file can be read by ParaView.
 
-void write_particle_vtk(int time, particle_struct particle) {
+void WriteParticleVTK(int time, Particle particle) {
 
   /// Create filename
 
-  stringstream output_filename;
+  std::stringstream output_filename;
   output_filename << "vtk_particle/particle_t" << time << ".vtk";
-  ofstream output_file;
+  std::ofstream output_file;
 
   /// Open file
 
@@ -1021,16 +990,16 @@ void write_particle_vtk(int time, particle_struct particle) {
 // - object center velocity (x- and y-components)
 // The data file is readable by gnuplot
 
-void write_data(int time, particle_struct particle) {
+void WriteData(int time, Particle particle) {
 
   /// Create filename
 
-  string output_filename("data.dat");
-  ofstream output_file;
+  std::string output_filename("data.dat");
+  std::ofstream output_file;
 
   /// Open file
 
-  output_file.open(output_filename.c_str(), fstream::app);
+  output_file.open(output_filename.c_str(), std::fstream::app);
 
   /// Compute quantities
 
