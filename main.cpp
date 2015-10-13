@@ -42,7 +42,6 @@ using namespace std; // permanently use the standard namespace
 // If a bottom or top wall shall move in negative x-direction,
 // a negative velocity has to be specified.
 // Moving walls and gravity can be switched on simultaneously.
-
 /// Simulation types
 // Exactly one of the following options has to be defined.
 // RIGID_CYLINDER
@@ -82,8 +81,8 @@ const double wall_vel_top = -wall_vel_bottom;
 const bool can_move = false;
 
 /// Particle properties
-const int particle_num_nodes = 60; // number of surface nodes
-const double particle_radius = 3.75; // radius
+const int particle_num_nodes = 10; // number of surface nodes
+const double particle_radius = 1; // radius
 const double particle_stiffness = 2.0; // stiffness modulus
 const double particle_bending = 0; // bending modulus
 const double particle_center_x = Nx / 2; // center position (x-component)
@@ -116,7 +115,8 @@ const std::vector<double> weight = {4.0 / 9.0,
 // In the present implementation, only a single object can be put into the flow.
 /// Structure for surface nodes
 // Each node has a current x- and y-position and a reference x- and y-position.
-struct Node {
+struct Node
+{
   /// Constructor
   Node() {
     x = 0;
@@ -128,9 +128,7 @@ struct Node {
     force_x = 0;
     force_y = 0;
   }
-
   /// Elements
-
   double x; // current x-position
   double y; // current y-position
   double x_ref; // reference x-position
@@ -142,8 +140,8 @@ struct Node {
 };
 
 /// Structure for object (either cylinder or red blood cell)
-
-struct Particle {
+struct Particle
+{
   /// Constructor
   Particle() {
     num_nodes = particle_num_nodes;
@@ -157,10 +155,6 @@ struct Particle {
 
     // The initial shape of the object is set in the following.
     // For a cylinder (rigid or deformable), the nodes define a circle.
-    // For a red blood cell, the y-position has to be changed in order to
-    // describe a red blood cell. Initially, the current node positions and
-    // reference node positions are identical. During the simulation, only the
-    // current positions are updated, the reference node positions are fixed.
     for (int n = 0; n < num_nodes; ++n) {
       auto theta = 2. * M_PI * (double) n / num_nodes;
       #if defined RIGID_CYLINDER || defined DEFORMABLE_CYLINDER
@@ -170,21 +164,6 @@ struct Particle {
         node[n].y_ref = center.y + radius * cos(theta);
       #endif
       #ifdef DEFORMABLE_RBC
-        node[n].x = center.x + radius * sin(theta);
-        node[n].x_ref = center.x + radius * sin(theta);
-        node[n].y = radius * cos(theta);
-        x_sqr = SQ((center.x - node[n].x) / radius);
-        outer_point = sqrt(1 - x_sqr) * (0.207 + 2.00 * x_sqr - 1.12 *
-            SQ(x_sqr)) * radius / 2;
-        // Parametrization of the red blood cell shape in 2D
-        if (node[n].y > 0) {
-          node[n].y = center.y + outer_point;
-          node[n].y_ref = center.y + outer_point;
-        }
-        else {
-          node[n].y = center.y - outer_point;
-          node[n].y_ref = center.y - outer_point;
-        }
       #endif
     }  // n
   }
@@ -233,7 +212,8 @@ void WriteData(int time
 /// *************
 // This is the main function, containing the simulation initialization and the
 // simulation loop.
-int main() {
+int main()
+{
   /// ************
   /// PREPARATIONS
   /// ************
@@ -257,7 +237,6 @@ int main() {
   std::cout << "umax = " << umax << std::endl;
   std::cout << "Re = " << Re << std::endl;
   std::cout << std::endl;
-
   /// ***************
   /// SIMULATION LOOP
   /// ***************
@@ -295,7 +274,8 @@ int main() {
 /// ****************************************
 // The memory for lattice variables (populations, density, velocity, forces) is
 // allocated. The variables are initialized.
-void Initialize() {
+void Initialize()
+{
   /// Create folders, delete data file
   // Make sure that the VTK folders exist.
   // Old file data.dat is deleted, if existing.
@@ -310,7 +290,6 @@ void Initialize() {
   velocity_y = new double*[Nx];
   force_x = new double*[Nx];
   force_y = new double*[Nx];
-
   for (int X = 0; X < Nx; ++X) {
     density[X] = new double[Ny];
     velocity_x[X] = new double[Ny];
@@ -318,7 +297,6 @@ void Initialize() {
     force_x[X] = new double[Ny];
     force_y[X] = new double[Ny];
   }  // X
-
   /// Initialize the fluid density and velocity
   // Start with unit density and zero velocity.
   for (int X = 0; X < Nx; ++X) {
@@ -330,11 +308,9 @@ void Initialize() {
       force_y[X][Y] = 0;
     }  // Y
   }  // X
-
   /// Allocate memory for the populations
   pop = new double**[9];
   pop_old = new double**[9];
-
   for (int i = 0; i < 9; ++i) {
     pop[i] = new double*[Nx];
     pop_old[i] = new double*[Nx];
@@ -347,7 +323,6 @@ void Initialize() {
       }  // Y
     }  // X
   }  // i
-
   /// Initialize the populations
   // Use the equilibrium populations corresponding to the initialized fluid
   // density and velocity.
@@ -371,7 +346,8 @@ void Initialize() {
 // The standard quadratic euilibrium is used.
 void ComputeEquilibrium(double den
   , double vel_x
-  , double vel_y) {
+  , double vel_y)
+{
   const auto u_sqr = 1.5 * SQ(vel_x) + SQ(vel_y);
   pop_eq[0] = weight[0] * den * (1                                                     - u_sqr);
   pop_eq[1] = weight[1] * den * (1 + 3 * (  vel_x        ) + 4.5 * SQ(  vel_x        ) - u_sqr);
@@ -390,7 +366,8 @@ void ComputeEquilibrium(double den
 /// PERFORM LBM OPERATIONS
 /// **********************
 
-void LatticeBoltzmannMethod(int time) {
+void LatticeBoltzmannMethod(int time)
+{
   /// Swap populations
   // The present code used old and new populations which are swapped at the beginning of each time step.
   // This is sometimes called 'double-buffered' or 'ping-pong' algorithm.
@@ -453,343 +430,156 @@ void LatticeBoltzmannMethod(int time) {
 // This function computes the fluid density and velocity from the populations.
 // The velocity correction due to body force is not included here.
 // It must be taken into account whenever the physical velocity is required.
-
-void ComputeMacroscopicProperties() {
-  for(int X = 0; X < Nx; ++X) {
-    for(int Y = 1; Y < Ny - 1; ++Y) {
+void ComputeMacroscopicProperties()
+{
+  for (int X = 0; X < Nx; ++X) {
+    for (int Y = 1; Y < Ny - 1; ++Y) {
       density[X][Y] = pop[0][X][Y] + pop[1][X][Y] + pop[2][X][Y] + pop[3][X][Y] + pop[4][X][Y] + pop[5][X][Y] + pop[6][X][Y] + pop[7][X][Y] + pop[8][X][Y];
       velocity_x[X][Y] = (pop[1][X][Y] - pop[2][X][Y] + pop[5][X][Y] - pop[6][X][Y] + pop[7][X][Y] - pop[8][X][Y]) / density[X][Y];
       velocity_y[X][Y] = (pop[3][X][Y] - pop[4][X][Y] + pop[5][X][Y] - pop[6][X][Y] - pop[7][X][Y] + pop[8][X][Y]) / density[X][Y];
     }
   }
-
   return;
 }
 
 /// ***********************
 /// COMPUTE PARTICLE FORCES
 /// ***********************
-
 // The forces acting on the object nodes are computed.
 // Depending on the simulation type (rigid/deformable cylinder or red blood cell),
 // the force computation is different.
-
-void ComputeParticleForces(Particle particle, int time) {
-
+void ComputeParticleForces(Particle particle, int time)
+{
   /// Reset forces
   // This way, the force from the previous time step is deleted.
   // This is necessary whenever forces are computed using '+='.
-
-  for(int n = 0; n < particle.num_nodes; ++n) {
+  for (int n = 0; n < particle.num_nodes; ++n) {
     particle.node[n].force_x = 0;
     particle.node[n].force_y = 0;
   }
   torque = 0.0;
 
   /// Compute strain forces
-  // The strain forces are proportional to the relative displacement of a node with respect to its two neighbors.
-  // This force is invariant under displacements and rotations,
-  // i.e., it is only sensitive to deformations.
-  // Newton's law is fulfilled: sum of forces is zero.
-  // In order to make the force distribution smoother, each node is assigned an equivalent area.
-  // This area is the circumference of the cylinder divided by the number of surface nodes.
-  // WARNING: This is a simple strain model and not necessarily sufficient for accurate simulations.
-
   #if defined DEFORMABLE_CYLINDER || defined DEFORMABLE_RBC
-    const double area = 2 * M_PI * particle.radius / particle.num_nodes; // area belonging to a node
-
-    for(int n = 0; n < particle.num_nodes; ++n) {
-      const double distance = sqrt(SQ(particle.node[n].x - particle.node[(n + 1) % particle.num_nodes].x) + SQ(particle.node[n].y - particle.node[(n + 1) % particle.num_nodes].y)); // current distance between neighboring nodes
-      const double distance_ref = sqrt(SQ(particle.node[n].x_ref - particle.node[(n + 1) % particle.num_nodes].x_ref) + SQ(particle.node[n].y_ref - particle.node[(n + 1) % particle.num_nodes].y_ref)); // reference distance between neighboring nodes
-      const double f_x = particle.stiffness * (distance - distance_ref) * (particle.node[n].x - particle.node[(n + 1) % particle.num_nodes].x);
-      const double f_y = particle.stiffness * (distance - distance_ref) * (particle.node[n].y - particle.node[(n + 1) % particle.num_nodes].y);
-      particle.node[n].force_x += -f_x;
-      particle.node[n].force_y += -f_y;
-      particle.node[(n + 1) % particle.num_nodes].force_x += f_x;
-      particle.node[(n + 1) % particle.num_nodes].force_y += f_y;
-    }
   #endif
-
   /// Compute bending forces
-  // The bending forces are proportional to the angle deviation (current versus reference angle).
-  // Angles are defined by three neighboring points (l = left, m = middle, r = right).
-  // It is distinguished between convex (positive angles) and concave (negative angles) shapes.
-  // Newton's law is fulfilled: sum of forces is zero.
-  // WARNING: This is a simple bending model and not necessarily sufficient for accurate simulations.
-
   #if defined DEFORMABLE_CYLINDER || defined DEFORMABLE_RBC
-    for(int n = 0; n < particle.num_nodes; ++n) {
-
-      /// Get node coordinates for bending
-      // Three neighboring nodes are required to compute the bending forces.
-      // Both their current and their reference positions are taken.
-
-      const double x_l = particle.node[(n - 1 + particle.num_nodes) % particle.num_nodes].x;
-      const double y_l = particle.node[(n - 1 + particle.num_nodes) % particle.num_nodes].y;
-      const double x_m = particle.node[n].x;
-      const double y_m = particle.node[n].y;
-      const double x_r = particle.node[(n + 1) % particle.num_nodes].x;
-      const double y_r = particle.node[(n + 1) % particle.num_nodes].y;
-      const double x_l_ref = particle.node[(n - 1 + particle.num_nodes) % particle.num_nodes].x_ref;
-      const double y_l_ref = particle.node[(n - 1 + particle.num_nodes) % particle.num_nodes].y_ref;
-      const double x_m_ref = particle.node[n].x_ref;
-      const double y_m_ref = particle.node[n].y_ref;
-      const double x_r_ref = particle.node[(n + 1) % particle.num_nodes].x_ref;
-      const double y_r_ref = particle.node[(n + 1) % particle.num_nodes].y_ref;
-
-      /// Compute normal vector direction
-      // The 'normal' vector of the middle node is defined to be normal to the vector connecting the left and the right nodes (tangential vector).
-      // It always points in outward direction.
-      // Both the current and the reference normals are computed.
-
-      const double tang_x_ref = x_r_ref - x_l_ref;
-      const double tang_y_ref = y_r_ref - y_l_ref;
-      double normal_x_ref;
-      double normal_y_ref;
-
-      if(abs(tang_x_ref) < abs(tang_y_ref)) {
-        normal_x_ref = 1;
-        normal_y_ref = -tang_x_ref / tang_y_ref;
-      }
-      else {
-        normal_y_ref = 1;
-        normal_x_ref = -tang_y_ref / tang_x_ref;
-      }
-
-      const double tang_x = x_r - x_l;
-      const double tang_y = y_r - y_l;
-      double normal_x;
-      double normal_y;
-
-      if(abs(tang_x) < abs(tang_y)) {
-        normal_x = 1;
-        normal_y = -tang_x / tang_y;
-      }
-      else {
-        normal_y = 1;
-        normal_x = -tang_y / tang_x;
-      }
-
-      /// Normalize normal vector to unit length and outward direction
-      // The normal vectors are defined to have unit length and point in outward direction.
-      // In order to check its direction, the cross product of the normal and the tangential vector is computed.
-
-      const double normal_length_ref = sqrt(SQ(normal_x_ref) + SQ(normal_y_ref));
-      normal_x_ref /= normal_length_ref;
-      normal_y_ref /= normal_length_ref;
-
-      if(normal_x_ref * tang_y_ref - normal_y_ref * tang_x_ref > 0) {
-        normal_x_ref *= -1;
-        normal_y_ref *= -1;
-      }
-
-      const double normal_length = sqrt(SQ(normal_x) + SQ(normal_y));
-      normal_x /= normal_length;
-      normal_y /= normal_length;
-
-      if(normal_x * tang_y - normal_y * tang_x > 0) {
-        normal_x *= -1;
-        normal_y *= -1;
-      }
-
-      /// Compute bending angles
-      // The angles (current and reference) are defined by the three points (left, middle, right).
-      // The angle is defined to be zero of all points are on one line.
-      // Angles are positive for convex shapes (e.g., circle) and negative else.
-      // The angle sign has to be checked explicitly.
-
-      double angle_ref_cos = (x_l_ref - x_m_ref) * (x_m_ref - x_r_ref) + (y_l_ref - y_m_ref) * (y_m_ref - y_r_ref);
-      angle_ref_cos /= (sqrt(SQ(x_l_ref - x_m_ref) + SQ(y_l_ref - y_m_ref)) * sqrt(SQ(x_m_ref - x_r_ref) + SQ(y_m_ref - y_r_ref)));
-      double angle_ref = acos(angle_ref_cos);
-
-      const double convex_x_ref = (x_l_ref + x_r_ref) / 2 - x_m_ref;
-      const double convex_y_ref = (y_l_ref + y_r_ref) / 2 - y_m_ref;
-
-      if(convex_x_ref * normal_x_ref + convex_y_ref * normal_y_ref > 0) {
-        angle_ref *= -1;
-      }
-
-      double angle_cos = (x_l - x_m) * (x_m - x_r) + (y_l - y_m) * (y_m - y_r);
-      angle_cos /= (sqrt(SQ(x_l - x_m) + SQ(y_l - y_m)) * sqrt(SQ(x_m - x_r) + SQ(y_m - y_r)));
-      double angle = acos(angle_cos);
-
-      const double convex_x = (x_l + x_r) / 2 - x_m;
-      const double convex_y = (y_l + y_r) / 2 - y_m;
-
-      if(convex_x * normal_x + convex_y * normal_y > 0) {
-        angle *= -1;
-      }
-
-      /// Compute force magnitude
-      // The forces are proportional to the angle deviation (current minus reference angle).
-      // The bending modulus controls the magnitude of the force.
-      // All three nodes defining the angle experience a bending force.
-      // The total sum of these forces is zero (Newton's law).
-
-      const double force_mag = particle_bending * (angle - angle_ref);
-      const double length_l = abs(tang_x * (x_m - x_l) + tang_y * (y_m - y_l));
-      const double length_r = abs(tang_x * (x_m - x_r) + tang_y * (y_m - y_r));
-
-      particle.node[(n - 1 + particle.num_nodes) % particle.num_nodes].force_x += normal_x * force_mag * length_l / (length_l + length_r);
-      particle.node[(n - 1 + particle.num_nodes) % particle.num_nodes].force_y += normal_y * force_mag * length_l / (length_l + length_r);
-      particle.node[n].force_x += -normal_x * force_mag;
-      particle.node[n].force_y += -normal_y * force_mag;
-      particle.node[(n + 1) % particle.num_nodes].force_x += normal_x * force_mag * length_r / (length_l + length_r);
-      particle.node[(n + 1) % particle.num_nodes].force_y += normal_y * force_mag * length_r / (length_l + length_r);
-    }
   #endif
-
   /// Compute rigid forces
   // Here, the node forces are proportional to the displacement with respect to the reference position.
-
   #ifdef RIGID_CYLINDER
     const double area = 2 * M_PI * particle.radius / particle.num_nodes; // area belonging to a node
-
-    for(int n = 0; n < particle.num_nodes; ++n) {
-      particle.node[n].force_x += -particle.stiffness * (particle.node[n].x - particle.node[n].x_ref) * area;
-      particle.node[n].force_y += -particle.stiffness * (particle.node[n].y - particle.node[n].y_ref) * area;
+    for (int n = 0; n < particle.num_nodes; ++n) {
+      auto restore_force_x = -particle.stiffness * (particle.node[n].x - particle.node[n].x_ref) * area;
+      auto restore_force_y = -particle.stiffness * (particle.node[n].y - particle.node[n].y_ref) * area;
+      particle.node[n].force_x += restore_force_x;
+      particle.node[n].force_y += restore_force_y;
       const auto x_d = particle.node[n].x - particle.center.x;
       const auto y_d = particle.node[n].y - particle.center.y;
-      torque += x_d * -particle.node[n].force_y - y_d * -particle.node[n].force_x;
+      torque += x_d * -restore_force_y - y_d * -restore_force_x;
     }
-//    std::cout << particle.torque << std::endl;
-
+//    std::cout << torque << std::endl;
   #endif
-
   return;
 }
 
 /// *************
 /// SPREAD FORCES
 /// *************
-
 // The node forces are spread to the fluid nodes via IBM.
-// The two-point interpolation stencil (bi-linear interpolation) is used in the present code.
-// It may be replaced by a higher-order interpolation.
-
-void SpreadForce(Particle particle) {
-
+// The two-point interpolation stencil (bi-linear interpolation) is used in the
+// present code.
+void SpreadForce(Particle particle)
+{
   /// Reset forces
   // This is necessary since '+=' is used afterwards.
-
-  for(int X = 0; X < Nx; ++X) {
-    for(int Y = 1; Y < Ny - 1; ++Y) {
+  for (int X = 0; X < Nx; ++X) {
+    for (int Y = 1; Y < Ny - 1; ++Y) {
       force_x[X][Y] = 0;
       force_y[X][Y] = 0;
     }
   }
-
   /// Spread forces
   // Run over all object nodes.
-
-  for(int n = 0; n < particle.num_nodes; ++n) {
-
+  for (int n = 0; n < particle.num_nodes; ++n) {
     // Identify the lowest fluid lattice node in interpolation range.
     // 'Lowest' means: its x- and y-values are the smallest.
     // The other fluid nodes in range have coordinates
     // (x_int + 1, y_int), (x_int, y_int + 1), and (x_int + 1, y_int + 1).
-
     int x_int = (int) (particle.node[n].x - 0.5 + Nx) - Nx;
     int y_int = (int) (particle.node[n].y + 0.5 );
 
     // Run over all neighboring fluid nodes.
     // In the case of the two-point interpolation, it is 2x2 fluid nodes.
-
-    for(int X = x_int; X <= x_int + 1; ++X) {
-      for(int Y = y_int; Y <= y_int + 1; ++Y) {
-
+    for (int X = x_int; X <= x_int + 1; ++X) {
+      for (int Y = y_int; Y <= y_int + 1; ++Y) {
         // Compute distance between object node and fluid lattice node.
-
         const double dist_x = particle.node[n].x - 0.5 - X;
         const double dist_y = particle.node[n].y + 0.5 - Y;
-
         // Compute interpolation weights for x- and y-direction based on the distance.
-
         const double weight_x = 1 - abs(dist_x);
         const double weight_y = 1 - abs(dist_y);
-
+        const auto weights = weight_x * weight_y;
         // Compute lattice force.
-
-        force_x[(X + Nx) % Nx][Y] += (particle.node[n].force_x * weight_x * weight_y);
-        force_y[(X + Nx) % Nx][Y] += (particle.node[n].force_y * weight_x * weight_y);
+        force_x[(X + Nx) % Nx][Y] += particle.node[n].force_x * weights;
+        force_y[(X + Nx) % Nx][Y] += particle.node[n].force_y * weights;
       }
     }
   }
-
   return;
 }
 
 /// **********************
 /// INTERPOLATE VELOCITIES
 /// **********************
-
 // The node velocities are interpolated from the fluid nodes via IBM.
 // The two-point interpolation stencil (bi-linear interpolation) is used in the present code.
 // It may be replaced by a higher-order interpolation.
-
-void InterpolateVelocity(Particle particle) {
-
+void InterpolateVelocity(Particle particle)
+{
   // Run over all object nodes.
-
-  for(int n = 0; n < particle.num_nodes; ++n) {
-
+  for (int n = 0; n < particle.num_nodes; ++n) {
     // Reset node velocity first since '+=' is used.
-
     particle.node[n].vel_x = 0;
     particle.node[n].vel_y = 0;
-
     // Identify the lowest fluid lattice node in interpolation range (see spreading).
-
     int x_int = (int) (particle.node[n].x - 0.5 + Nx) - Nx;
     int y_int = (int) (particle.node[n].y + 0.5 );
-
     // Run over all neighboring fluid nodes.
     // In the case of the two-point interpolation, it is 2x2 fluid nodes.
-
-    for(int X = x_int; X <= x_int + 1; ++X) {
-      for(int Y = y_int; Y <= y_int + 1; ++Y) {
-
+    for (int X = x_int; X <= x_int + 1; ++X) {
+      for (int Y = y_int; Y <= y_int + 1; ++Y) {
         // Compute distance between object node and fluid lattice node.
-
         const double dist_x = particle.node[n].x - 0.5 - X;
         const double dist_y = particle.node[n].y + 0.5 - Y;
-
         // Compute interpolation weights for x- and y-direction based on the distance.
-
         const double weight_x = 1 - abs(dist_x);
         const double weight_y = 1 - abs(dist_y);
-
+        const auto weights = weight_x * weight_y;
         // Compute node velocities.
-
-        particle.node[n].vel_x += ((velocity_x[(X + Nx) % Nx][Y] + 0.5 * (force_x[(X + Nx) % Nx][Y] + gravity) / density[(X + Nx) % Nx][Y]) * weight_x * weight_y);
-        particle.node[n].vel_y += ((velocity_y[(X + Nx) % Nx][Y] + 0.5 * (force_y[(X + Nx) % Nx][Y]) / density[(X + Nx) % Nx][Y]) * weight_x * weight_y);
+        particle.node[n].vel_x += ((velocity_x[(X + Nx) % Nx][Y] + 0.5 * (force_x[(X + Nx) % Nx][Y] + gravity) / density[(X + Nx) % Nx][Y]) * weights);
+        particle.node[n].vel_y += ((velocity_y[(X + Nx) % Nx][Y] + 0.5 * (force_y[(X + Nx) % Nx][Y]) / density[(X + Nx) % Nx][Y]) * weights);
       }
     }
   }
-
   return;
 }
 
 /// ************************
 /// UPDATE PARTICLE POSITION
 /// ************************
-
 // The position of the particle nodes are updated according to their velocity.
 // The center position is updated as well.
-// The new node position is its old position plus its current velocity (Euler integration).
-// The center position is the arithmetic mean of all node positions.
-// Periodicity is taken into account:
-// If the particle center leaves the system domain (x < 0 or x >= Nx), it reenters from the other side.
-
-void UpdateParticlePosition(Particle particle) {
-
+// The new node position is its old position plus its current velocity (Euler
+// integration). The center position is the arithmetic mean of all node
+// positions. Periodicity is taken into account: If the particle center leaves
+// the system domain (x < 0 or x >= Nx), it reenters from the other side.
+void UpdateParticlePosition(Particle particle)
+{
   /// Reset center position
-
   particle.center.x = 0;
   particle.center.y = 0;
-
   /// Update node and center positions
-
   for (int n = 0; n < particle.num_nodes; ++n) {
     particle.node[n].x += particle.node[n].vel_x;
     particle.node[n].y += particle.node[n].vel_y;
@@ -799,32 +589,38 @@ void UpdateParticlePosition(Particle particle) {
   if (can_move) {
     particle.center.x_ref = particle.center.x;
     particle.center.y_ref = particle.center.y;
-    for(int n = 0; n < particle.num_nodes; ++n) {
-      particle.node[n].x_ref = particle.center.x_ref + particle.radius * sin(2. *
-          M_PI * (double) n / particle.num_nodes);
-      particle.node[n].y_ref = particle.center.y_ref + particle.radius * cos(2. *
-          M_PI * (double) n / particle.num_nodes);
-    }
+    for (int n = 0; n < particle.num_nodes; ++n) {
+      particle.node[n].x_ref = particle.center.x_ref + particle.radius *
+          sin(2. *  M_PI * (double) n / particle.num_nodes);
+      particle.node[n].y_ref = particle.center.y_ref + particle.radius *
+          cos(2. *  M_PI * (double) n / particle.num_nodes);
+    }  // n
 //    for (int n = 0; n < particle.num_nodes; ++n) {
 //      particle.node[n].x += particle.node[n].vel_x;
 //      particle.node[n].y += particle.node[n].vel_y;
 //    }
   }
-  ang_vel -= torque / particle_radius / particle_radius / 2;
-  const auto angle = fabs(ang_vel);
-  const auto dir = ang_vel / fabs(ang_vel);
-  for(int n = 0; n < particle.num_nodes; ++n) {
-    const auto old_x = particle.node[n].x_ref - particle.center.x_ref;
-    const auto old_y = particle.node[n].y_ref - particle.center.y_ref;
-    const auto mov_x = cos(angle) * old_x - dir * sin(angle) * old_y;
-    const auto mov_y = dir * sin(angle) * old_x + cos(angle) * old_y;
+  ang_vel += torque / particle_radius / particle_radius;
+  std::cout << ang_vel << std::endl;
+//  const auto angle = fabs(ang_vel);
+//  const auto dir = ang_vel / fabs(ang_vel);
+  for (int n = 0; n < particle.num_nodes; ++n) {
+    const auto old_x_ref = particle.node[n].x_ref - particle.center.x_ref;
+    const auto old_y_ref = particle.node[n].y_ref - particle.center.y_ref;
+    const auto old_x = particle.node[n].x - particle.center.x;
+    const auto old_y = particle.node[n].y - particle.center.y;
+    const auto mov_x_ref = cos(ang_vel) * old_x_ref - sin(ang_vel) * old_y_ref;
+    const auto mov_y_ref = sin(ang_vel) * old_x_ref + cos(ang_vel) * old_y_ref;
+    const auto mov_x = cos(ang_vel) * old_x - sin(ang_vel) * old_y;
+    const auto mov_y = sin(ang_vel) * old_x + cos(ang_vel) * old_y;
 //    std::cout << mov_x << std::endl;
-//    particle.node[n].x_ref = mov_x + particle.center.x_ref;
-//    particle.node[n].y_ref = mov_y + particle.center.y_ref;
-  }
+    particle.node[n].x_ref = particle.center.x_ref + mov_x_ref;
+    particle.node[n].y_ref = particle.center.y_ref + mov_y_ref;
+    particle.node[n].x = particle.center.x + mov_x;
+    particle.node[n].y = particle.center.y + mov_y;
+  }  // n
 
   /// Check for periodicity along the x-axis
-
   if (particle.center.x < 0) {
     particle.center.x += Nx;
     for (int n = 0; n < particle.num_nodes; ++n) particle.node[n].x += Nx;
@@ -849,28 +645,23 @@ void UpdateParticlePosition(Particle particle) {
 /// *****************************
 /// WRITE FLUID STATE TO VTK FILE
 /// *****************************
-
 // The fluid state is writen to a VTK file at each t_disk step.
 // The following data is written:
 // - density difference (density - 1)
 // - x-component of velocity
 // - y-component of velocity
-// The following code is designed in such a way that the file can be read by ParaView.
-
-void WriteFluidVTK(int time) {
-
+// The following code is designed in such a way that the file can be read by
+// ParaView.
+void WriteFluidVTK(int time)
+{
   /// Create filename
-
   std::stringstream output_filename;
   output_filename << "vtk_fluid/fluid_t" << time << ".vtk";
   std::ofstream output_file;
 
   /// Open file
-
   output_file.open(output_filename.str().c_str());
-
   /// Write VTK header
-
   output_file << "# vtk DataFile Version 3.0\n";
   output_file << "fluid_state\n";
   output_file << "ASCII\n";
@@ -878,137 +669,104 @@ void WriteFluidVTK(int time) {
   output_file << "DIMENSIONS " << Nx << " " << Ny - 2 << " 1" << "\n";
   output_file << "X_COORDINATES " << Nx << " float\n";
 
-  for(int X = 0; X < Nx; ++X) {
-    output_file << X + 0.5 << " ";
-  }
-
+  for (int X = 0; X < Nx; ++X) output_file << X + 0.5 << " ";
   output_file << "\n";
   output_file << "Y_COORDINATES " << Ny - 2 << " float\n";
-
-  for(int Y = 1; Y < Ny - 1; ++Y) {
-    output_file << Y - 0.5 << " ";
-  }
-
+  for (int Y = 1; Y < Ny - 1; ++Y) output_file << Y - 0.5 << " ";
   output_file << "\n";
   output_file << "Z_COORDINATES " << 1 << " float\n";
   output_file << 0 << "\n";
   output_file << "POINT_DATA " << Nx * (Ny - 2) << "\n";
 
   /// Write density difference
-
   output_file << "SCALARS density_difference float 1\n";
   output_file << "LOOKUP_TABLE default\n";
 
-  for(int Y = 1; Y < Ny - 1; ++Y) {
-    for(int X = 0; X < Nx; ++X) {
-      output_file << density[X][Y] - 1 << "\n";
-    }
-  }
+  for (int Y = 1; Y < Ny - 1; ++Y) {
+    for (int X = 0; X < Nx; ++X) output_file << density[X][Y] - 1 << "\n";
+  }  // Y
 
   /// Write velocity
-
   output_file << "VECTORS velocity_vector float\n";
-
-  for(int Y = 1; Y < Ny - 1; ++Y) {
-    for(int X = 0; X < Nx; ++X) {
+  for (int Y = 1; Y < Ny - 1; ++Y) {
+    for (int X = 0; X < Nx; ++X) {
       output_file << velocity_x[X][Y] + 0.5 * (force_x[X][Y] + gravity) / density[X][Y] << " " << velocity_y[X][Y] + 0.5 * (force_y[X][Y]) / density[X][Y] << " 0\n";
     }
   }
-
   /// Close file
-
   output_file.close();
-
   return;
 }
 
 /// ********************************
 /// WRITE PARTICLE STATE TO VTK FILE
 /// ********************************
+// The particle state (node positions) is writen to a VTK file at each t_disk
+// step. The following code is designed in such a way that the file can be read
+// by ParaView.
 
-// The particle state (node positions) is writen to a VTK file at each t_disk step.
-// The following code is designed in such a way that the file can be read by ParaView.
-
-void WriteParticleVTK(int time, Particle particle) {
-
+void WriteParticleVTK(int time, Particle particle)
+{
   /// Create filename
-
   std::stringstream output_filename;
   output_filename << "vtk_particle/particle_t" << time << ".vtk";
   std::ofstream output_file;
 
   /// Open file
-
   output_file.open(output_filename.str().c_str());
 
   /// Write VTK header
-
   output_file << "# vtk DataFile Version 3.0\n";
   output_file << "particle_state\n";
   output_file << "ASCII\n";
   output_file << "DATASET POLYDATA\n";
 
   /// Write node positions
-
   output_file << "POINTS " << particle_num_nodes << " float\n";
-
-  for(int n = 0; n < particle_num_nodes; ++n) {
+  for (int n = 0; n < particle_num_nodes; ++n) {
     output_file << particle.node[n].x << " " << particle.node[n].y << " 0\n";
   }
 
   /// Write lines between neighboring nodes
-
   output_file << "LINES " << particle_num_nodes << " " << 3 * particle_num_nodes << "\n";
-
-  for(int n = 0; n < particle_num_nodes; ++n) {
+  for (int n = 0; n < particle_num_nodes; ++n) {
     output_file << "2 " << n << " " << (n + 1) % particle_num_nodes << "\n";
   }
 
   /// Write vertices
-
   output_file << "VERTICES 1 " << particle_num_nodes + 1 << "\n";
   output_file << particle_num_nodes << " ";
-
-  for(int n = 0; n < particle_num_nodes; ++n) {
-    output_file << n << " ";
-  }
+  for (int n = 0; n < particle_num_nodes; ++n) output_file << n << " ";
 
   /// Close file
-
   output_file.close();
-
   return;
 }
 
 /// ************************
 /// WRITE DATA TO ASCII FILE
 /// ************************
-
 // The following quantities are written to the disk at each t_disk step:
 // - drag and lift forces (x- and y-components of the force)
 // - object center position (x- and y-components)
 // - object center velocity (x- and y-components)
 // The data file is readable by gnuplot
-
-void WriteData(int time, Particle particle) {
-
+void WriteData(int time, Particle particle)
+{
   /// Create filename
-
   std::string output_filename("data.dat");
   std::ofstream output_file;
 
   /// Open file
-
   output_file.open(output_filename.c_str(), std::fstream::app);
 
   /// Compute quantities
-
   double force_tot_x = 0;
   double force_tot_y = 0;
   double vel_center_x = 0;
   double vel_center_y = 0;
 
-  for(int i = 0; i < particle.num_nodes; ++i) {
+  for (int i = 0; i < particle.num_nodes; ++i) {
     force_tot_x += particle.node[i].force_x;
     force_tot_y += particle.node[i].force_y;
     vel_center_x += particle.node[i].vel_x;
@@ -1016,7 +774,6 @@ void WriteData(int time, Particle particle) {
   }
 
   /// Write data
-
   output_file << time << " "; // time step
   output_file << force_tot_x << " "; // drag force
   output_file << force_tot_y << " "; // lift force
@@ -1027,8 +784,6 @@ void WriteData(int time, Particle particle) {
   output_file << vel_center_y << "\n"; // center velocity (y-component)
 
   /// Close file
-
   output_file.close();
-
   return;
 }
